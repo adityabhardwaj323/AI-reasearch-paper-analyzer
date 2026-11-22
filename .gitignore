@@ -1,6 +1,10 @@
 # ── Virtual environments ─────────────────────────────────────────────────────
 venv/
 .venv/
+.preview-runtime/
+.google-genai-stage/
+.googleauth-stage/
+constraints-preview.txt
 env/
 ENV/
 

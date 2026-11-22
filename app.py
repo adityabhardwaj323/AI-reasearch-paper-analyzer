@@ -1,6 +1,13 @@
 import streamlit as st
 import time
-from pipeline import get_files_text, get_text_chunks, get_vector_store, user_input
+try:
+    from pipeline import get_files_text, get_text_chunks, get_vector_store, user_input
+    PIPELINE_IMPORT_ERROR = None
+except Exception as exc:
+    # Keep the interface available when an optional AI/backend dependency is
+    # missing or damaged; this is useful for local UI previews and diagnosis.
+    get_files_text = get_text_chunks = get_vector_store = user_input = None
+    PIPELINE_IMPORT_ERROR = str(exc)
 from analysis import (
     keyword_frequency_chart,
     document_comparison_chart,
@@ -770,7 +777,11 @@ if not st.session_state.show_workspace:
             accept_multiple_files=True,
             type=["pdf", "docx"],
             label_visibility="collapsed",
+            disabled=PIPELINE_IMPORT_ERROR is not None,
         )
+
+        if PIPELINE_IMPORT_ERROR:
+            st.info("Preview mode: the interface is available, but document analysis is disabled because an AI dependency could not be loaded.")
 
         if uploaded_files:
             tags_html = "".join(
@@ -782,7 +793,7 @@ if not st.session_state.show_workspace:
 
         if st.button(
             "⚡  Analyze Papers",
-            disabled=not uploaded_files,
+            disabled=not uploaded_files or PIPELINE_IMPORT_ERROR is not None,
             type="primary",
             use_container_width=True,
         ):

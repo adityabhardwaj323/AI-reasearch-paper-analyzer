@@ -7,7 +7,10 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.combine_documents import create_stuff_documents_chain
+try:
+    from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+except ImportError:  # Compatibility with LangChain versions that still expose it here.
+    from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
 import time

@@ -27,14 +27,17 @@ pip install -r requirements.txt
 ```
 
 ### 3. Configuration
-Create a `.env.local` file in the root directory and add your API key:
+You can enter your keys in the app's **Configure AI provider keys** panel. Keys entered there are held in the current Streamlit session and are not written to project files. For a local environment-based setup, create a `.env.local` file in the root directory:
 ```text
 GOOGLE_API_KEY=your_actual_key_here
+GROQ_API_KEY=your_optional_fallback_key_here
 ```
+
+Google Gemini is required because it creates document and query embeddings and provides the primary answers. Groq is optional and can provide the answer when Gemini's response generation reaches a quota limit; Gemini is still needed for search and embeddings. Papers and retrieved passages are sent to the provider handling that operation. The FAISS index is kept in a local per-session temporary folder and removed when you start a new session. When hosted remotely, serve the app over HTTPS and use a host you trust.
 
 ### 4. Run the App
 ```bash
-streamlit run src/pipeline_1.py
+streamlit run app.py
 ```
 
 ## 🛠️ Technology Stack

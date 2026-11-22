@@ -1,5 +1,8 @@
 import streamlit as st
 import time
+import os
+import shutil
+import tempfile
 try:
     from pipeline import (
         get_files_text,
@@ -7,15 +10,17 @@ try:
         get_vector_store,
         user_input,
         google_api_key,
+        groq_api_key,
+        groq_api_available,
     )
     PIPELINE_IMPORT_ERROR = None
-    GOOGLE_API_CONFIGURED = bool(google_api_key)
 except Exception as exc:
     # Keep the interface available when an optional AI/backend dependency is
     # missing or damaged; this is useful for local UI previews and diagnosis.
     get_files_text = get_text_chunks = get_vector_store = user_input = None
     PIPELINE_IMPORT_ERROR = str(exc)
-    GOOGLE_API_CONFIGURED = False
+    google_api_key = groq_api_key = ""
+    groq_api_available = False
 from analysis import (
     keyword_frequency_chart,
     document_comparison_chart,
@@ -596,6 +601,56 @@ button[kind="primary"]:hover {
 }
 [data-testid="stChatInput"] textarea::placeholder { color: var(--text-3) !important; }
 
+/* ── PROVIDER KEY INPUTS ── */
+[data-testid="stTextInput"] label {
+    color: var(--text-2) !important;
+    font-family: 'Geist', sans-serif !important;
+    font-size: 13px !important;
+}
+[data-testid="stTextInput"] input {
+    color: var(--text) !important;
+    background: var(--bg-3) !important;
+    border-color: var(--border-hi) !important;
+}
+[data-testid="stTextInput"] input::placeholder { color: var(--text-3) !important; }
+[data-testid="stTextInput"] button {
+    color: var(--text-2) !important;
+    background: transparent !important;
+    border: 0 !important;
+}
+label {
+    color: var(--text-2) !important;
+    font-family: 'Geist', sans-serif !important;
+    font-size: 13px !important;
+}
+[data-testid="stWidgetLabel"],
+[data-testid="stWidgetLabel"] p,
+[data-testid*="TextInput"] label {
+    color: var(--text-2) !important;
+}
+[data-baseweb="input"],
+[data-baseweb="base-input"] {
+    background: var(--bg-3) !important;
+    border-color: var(--border-hi) !important;
+}
+input[type="password"],
+input[type="text"],
+input[type="email"] {
+    color: var(--text) !important;
+    background: var(--bg-3) !important;
+    border-color: var(--border-hi) !important;
+}
+input[type="password"]::placeholder,
+input[type="text"]::placeholder,
+input[type="email"]::placeholder { color: var(--text-3) !important; }
+form button:not([aria-label]) {
+    color: #0d0e17 !important;
+    background: linear-gradient(135deg, #7c6fec, #a78bfa) !important;
+    border: 0 !important;
+    border-radius: var(--r-md) !important;
+    min-height: 42px;
+}
+
 /* ── FILE UPLOADER ── */
 [data-testid="stFileUploader"] section {
     background: rgba(255,255,255,0.02) !important;
@@ -684,9 +739,11 @@ button[kind="primary"]:hover {
     font-family: 'Geist', sans-serif !important;
     font-size: 13px !important;
     font-weight: 500 !important;
-    color: var(--text-2) !important;
+    color: var(--text) !important;
+    background: var(--bg-2) !important;
     padding: 14px 18px !important;
 }
+[data-testid="stExpander"] summary:hover { background: var(--bg-3) !important; }
 
 /* ── SPINNER ── */
 [data-testid="stSpinner"] p {
@@ -833,6 +890,7 @@ _defaults = {
     "total_chunks":       0,
     "retrieved_chunks":   [],
     "show_workspace":     False,
+    "vector_store_dir":   None,
     # Analysis result cache — prevents re-firing on tab switch
     "cache_methodology":  None,
     "cache_contributions":None,
@@ -846,6 +904,30 @@ for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+if not st.session_state.vector_store_dir:
+    st.session_state.vector_store_dir = tempfile.mkdtemp(prefix="papermind-index-")
+
+
+def _active_google_key():
+    return st.session_state.get("google_api_key_input", "").strip() or google_api_key
+
+
+def _active_groq_key():
+    return st.session_state.get("groq_api_key_input", "").strip() or groq_api_key
+
+
+def _session_user_input(question):
+    return user_input(
+        question,
+        google_key=_active_google_key(),
+        groq_key=_active_groq_key(),
+        index_dir=st.session_state.vector_store_dir,
+    )
+
+
+GOOGLE_API_CONFIGURED = bool(_active_google_key())
+GROQ_API_CONFIGURED = bool(_active_groq_key()) and groq_api_available
+
 
 # ── Navbar (always shown) ────────────────────────────────────────────────────────
 if PIPELINE_IMPORT_ERROR:
@@ -856,6 +938,8 @@ elif not GOOGLE_API_CONFIGURED:
     backend_status_class = "is-warning"
 else:
     backend_status = "Gemini key configured"
+    if GROQ_API_CONFIGURED:
+        backend_status += " · Groq fallback configured"
     backend_status_class = ""
 
 st.markdown(f"""
@@ -870,6 +954,34 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+with st.expander("🔑 Configure AI provider keys", expanded=not GOOGLE_API_CONFIGURED):
+    with st.form("provider_keys_form"):
+        st.text_input(
+            "Google Gemini API key",
+            type="password",
+            key="google_api_key_input",
+            placeholder="Paste your Google AI Studio key",
+            help="Required for document embeddings and the primary AI responses.",
+        )
+        st.text_input(
+            "Groq API key (optional fallback)",
+            type="password",
+            key="groq_api_key_input",
+            placeholder="Paste your Groq key to enable fallback",
+            help="Used for answer generation if Gemini's response hits quota. Gemini is still required for document and query embeddings.",
+        )
+        keys_submitted = st.form_submit_button("Save keys for this session", type="primary", use_container_width=True)
+    st.caption("Keys stay in this app session and are not written to project files. Paper text is sent to Gemini for embeddings and answers; a per-session local index is used for retrieval. If Gemini's answer generation hits quota, retrieved text and your question are sent to Groq when a fallback key is configured. Gemini is still needed to create embeddings. When hosted remotely, use HTTPS and a host you trust.")
+    if keys_submitted:
+        if not GOOGLE_API_CONFIGURED:
+            st.warning("A Google Gemini key is required to create document embeddings. Groq alone cannot index papers.")
+        elif _active_groq_key() and not groq_api_available:
+            st.warning("The Groq key is saved for this session, but the Groq integration is unavailable in this environment.")
+        elif GROQ_API_CONFIGURED:
+            st.success("Gemini and Groq keys are available for this session.")
+        else:
+            st.success("Gemini key is available for this session. Groq fallback is optional.")
 
 
 # ════════════════════════════════════════════════════════════════════════════════
@@ -914,7 +1026,7 @@ if not st.session_state.show_workspace:
                 with st.expander("Technical details"):
                     st.code(PIPELINE_IMPORT_ERROR)
             elif not GOOGLE_API_CONFIGURED:
-                st.warning("Add GOOGLE_API_KEY to .env.local to enable document analysis. You can still preview the upload interface.")
+                st.warning("Add a Google Gemini key in “Configure AI provider keys” to enable analysis. Groq alone cannot create the document embeddings needed for search.")
 
             if uploaded_files:
                 tags_html = "".join(
@@ -938,7 +1050,11 @@ if not st.session_state.show_workspace:
                     text_chunks = get_text_chunks(raw_text)
 
                     st.write("🔗 Building vector embeddings…")
-                    index_ready = get_vector_store(text_chunks)
+                    index_ready = get_vector_store(
+                        text_chunks,
+                        google_key=_active_google_key(),
+                        index_dir=st.session_state.vector_store_dir,
+                    )
 
                     if text_chunks and index_ready:
                         st.session_state.combined_text = raw_text
@@ -1059,7 +1175,7 @@ else:
                     for s in suggestions:
                         if st.button(s, key=f"sugg_{s}", use_container_width=True):
                             with st.spinner(""):
-                                user_input(s)
+                                _session_user_input(s)
                             st.rerun()
 
                 # Chat input — at bottom of panel (Streamlit renders this at page bottom)
@@ -1067,7 +1183,7 @@ else:
                 user_query = st.chat_input("Ask anything about your research papers…")
                 if user_query:
                     with st.spinner(""):
-                        user_input(user_query)
+                        _session_user_input(user_query)
                     st.rerun()
 
                 # Action row
@@ -1080,6 +1196,9 @@ else:
                         st.rerun()
                 with a2:
                     if st.button("↩  New Session", use_container_width=True, key="new_session"):
+                        old_index_dir = st.session_state.get("vector_store_dir")
+                        if old_index_dir and os.path.basename(old_index_dir).startswith("papermind-index-"):
+                            shutil.rmtree(old_index_dir, ignore_errors=True)
                         for k, v in _defaults.items():
                             st.session_state[k] = v
                         st.rerun()
@@ -1123,50 +1242,50 @@ else:
                     with tabs[0]:
                         if st.session_state.cache_methodology is None:
                             with st.spinner("Analyzing methodology…"):
-                                methodology_card(user_input, doc_names)
+                                methodology_card(_session_user_input, doc_names)
                             st.session_state.cache_methodology = True
                         else:
-                            methodology_card(user_input, doc_names)
+                            methodology_card(_session_user_input, doc_names)
 
                     with tabs[1]:
                         if st.session_state.cache_contributions is None:
                             with st.spinner("Extracting contributions…"):
-                                contributions_card(user_input, doc_names)
+                                contributions_card(_session_user_input, doc_names)
                             st.session_state.cache_contributions = True
                         else:
-                            contributions_card(user_input, doc_names)
+                            contributions_card(_session_user_input, doc_names)
 
                     with tabs[2]:
                         if st.session_state.cache_limitations is None:
                             with st.spinner("Identifying limitations…"):
-                                limitations_card(user_input, doc_names)
+                                limitations_card(_session_user_input, doc_names)
                             st.session_state.cache_limitations = True
                         else:
-                            limitations_card(user_input, doc_names)
+                            limitations_card(_session_user_input, doc_names)
 
                     with tabs[3]:
                         if st.session_state.cache_techstack is None:
                             with st.spinner("Mapping tech stack…"):
-                                techstack_card(user_input, doc_names)
+                                techstack_card(_session_user_input, doc_names)
                             st.session_state.cache_techstack = True
                         else:
-                            techstack_card(user_input, doc_names)
+                            techstack_card(_session_user_input, doc_names)
 
                     with tabs[4]:
                         if st.session_state.cache_quality is None:
                             with st.spinner("Scoring quality…"):
-                                quality_scorecard(user_input, doc_names)
+                                quality_scorecard(_session_user_input, doc_names)
                             st.session_state.cache_quality = True
                         else:
-                            quality_scorecard(user_input, doc_names)
+                            quality_scorecard(_session_user_input, doc_names)
 
                     with tabs[5]:
                         if st.session_state.cache_abstract is None:
                             with st.spinner("Building abstracts…"):
-                                abstract_comparison_card(user_input, doc_names)
+                                abstract_comparison_card(_session_user_input, doc_names)
                             st.session_state.cache_abstract = True
                         else:
-                            abstract_comparison_card(user_input, doc_names)
+                            abstract_comparison_card(_session_user_input, doc_names)
 
                     st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
                     if st.button("🔄  Refresh Analysis", use_container_width=True, key="refresh_analysis"):

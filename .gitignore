@@ -30,7 +30,6 @@ faiss_index/
 
 # ── Streamlit ─────────────────────────────────────────────────────────────────
 .streamlit/secrets.toml
-.streamlit/config.toml
 
 # ── Jupyter / IPython ─────────────────────────────────────────────────────────
 .ipynb_checkpoints/

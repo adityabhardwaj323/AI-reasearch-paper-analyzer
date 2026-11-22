@@ -22,6 +22,7 @@ try:
     _GROQ_AVAILABLE = True
 except ImportError:
     _GROQ_AVAILABLE = False
+groq_api_available = _GROQ_AVAILABLE
 
 # Load environment variables (prioritize .env.local then .env)
 load_dotenv(".env.local")
@@ -37,10 +38,7 @@ def handle_ai_errors(func):
         try:
             return func(*args, **kwargs)
         except google_exceptions.ResourceExhausted:
-            if _GROQ_AVAILABLE and groq_api_key:
-                st.warning("⚡ **Gemini quota reached — switching to Groq fallback…**")
-            else:
-                st.error("⚠️ **Quota Exhausted:** Gemini free-tier limit reached and no Groq fallback is configured. Add GROQ_API_KEY to .env.local or wait a minute.")
+            st.error("⚠️ Gemini quota reached while creating embeddings. Wait and retry, or use a Google key with available quota.")
             return None
         except google_exceptions.Unauthenticated:
             st.error("🔑 **Authentication Error:** Your Google API Key is invalid or missing.")
@@ -129,17 +127,18 @@ def get_text_chunks(text):
 
 # Function to generate vector embeddings from text chunks and store them in a FAISS index
 @handle_ai_errors
-def get_vector_store(text_chunks):
+def get_vector_store(text_chunks, google_key=None, index_dir="faiss_index"):
     if not text_chunks:
         st.error("No text found in the uploaded files to process.")
         return
-    if not google_api_key:
-        st.error("Google API Key is missing. Please set it in your .env.local file.")
+    google_key = google_key or google_api_key
+    if not google_key:
+        st.error("Google Gemini API key is missing. Add one in the provider settings or configure it in .env.local.")
         return
         
     embeddings = GoogleGenerativeAIEmbeddings(
         model="models/gemini-embedding-001",
-        google_api_key=google_api_key,
+        google_api_key=google_key,
         task_type="retrieval_document",
     )
 
@@ -185,7 +184,7 @@ def get_vector_store(text_chunks):
             for i in range(len(text_chunks))
         ],
     )
-    vector_store.save_local("faiss_index")
+    vector_store.save_local(index_dir)
     return True
 
 # ── Shared prompt template ──────────────────────────────────────────────────────
@@ -211,21 +210,23 @@ def _build_chain(model):
     return create_stuff_documents_chain(model, prompt)
 
 
-def get_conversational_chain(use_groq: bool = False):
+def get_conversational_chain(use_groq: bool = False, google_key=None, groq_key=None):
     """Return a conversational chain.
 
     Args:
         use_groq: If True, use Groq (fallback). Otherwise use Gemini (primary).
     """
+    google_key = google_key or google_api_key
+    groq_key = groq_key or groq_api_key
     if use_groq:
         if not _GROQ_AVAILABLE:
             raise ImportError("langchain-groq is not installed. Run: pip install langchain-groq")
-        if not groq_api_key:
-            raise ValueError("GROQ_API_KEY is not set in your environment.")
+        if not groq_key:
+            raise ValueError("Groq API key is not configured.")
         model = ChatGroq(
             model="llama-3.3-70b-versatile",
             temperature=0.5,          # slightly higher = more varied, less loopy
-            api_key=groq_api_key,
+            api_key=groq_key,
             max_tokens=2048,           # hard cap prevents runaway generation
             model_kwargs={
                 "frequency_penalty": 0.6,   # penalise repeated tokens strongly
@@ -236,31 +237,37 @@ def get_conversational_chain(use_groq: bool = False):
         model = ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
             temperature=0.3,
-            google_api_key=google_api_key,
+            google_api_key=google_key,
         )
     return _build_chain(model)
 
 # Function to handle user input and generate a response based on the FAISS index
-def user_input(user_question):
+def user_input(user_question, google_key=None, groq_key=None, index_dir="faiss_index"):
     """Answer a question using RAG. Tries Gemini first; falls back to Groq."""
-    if not google_api_key:
-        st.error("Google API Key is missing. Please set it in your .env.local file.")
+    google_key = google_key or google_api_key
+    groq_key = groq_key or groq_api_key
+    if not google_key:
+        st.error("Google Gemini API key is missing. Add one in the provider settings or configure it in .env.local.")
         return
 
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/gemini-embedding-001",
-        google_api_key=google_api_key,
-        task_type="retrieval_query",
-    )
+    try:
+        embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/gemini-embedding-001",
+            google_api_key=google_key,
+            task_type="retrieval_query",
+        )
 
-    # Load the FAISS index from local storage
-    new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
-
-    # Fetch more candidates when multiple docs are loaded so each paper is
-    # represented; then store retrieved indices for the chunk heatmap
-    num_docs = len(st.session_state.get("file_stats", []))
-    k        = max(6, num_docs * 3)   # at least 3 chunks per document
-    docs     = new_db.similarity_search(user_question, k=k)
+        # Load this Streamlit session's local index and retrieve source passages.
+        new_db = FAISS.load_local(index_dir, embeddings, allow_dangerous_deserialization=True)
+        num_docs = len(st.session_state.get("file_stats", []))
+        k        = max(6, num_docs * 3)
+        docs     = new_db.similarity_search(user_question, k=k)
+    except google_exceptions.ResourceExhausted:
+        st.error("Gemini quota was reached while searching the papers. Groq can only replace answer generation; Gemini is still required for embeddings and search.")
+        return
+    except Exception as e:
+        st.error(f"Could not search the indexed papers: {str(e)}")
+        return
 
     # Annotate every retrieved Document with its source so the LLM sees it
     for doc in docs:
@@ -274,19 +281,19 @@ def user_input(user_question):
 
     # ── Primary: Gemini ──────────────────────────────────────────────────────────
     try:
-        chain = get_conversational_chain(use_groq=False)
+        chain = get_conversational_chain(use_groq=False, google_key=google_key, groq_key=groq_key)
         response = chain.invoke({"context": docs, "input": user_question})
         st.session_state.chat_history.append((user_question, response))
         return
 
     except google_exceptions.ResourceExhausted:
         # Quota hit — try Groq fallback
-        if _GROQ_AVAILABLE and groq_api_key:
+        if _GROQ_AVAILABLE and groq_key:
             st.toast("⚡ Gemini quota reached — switching to Groq (Llama 3.3 70B)…", icon="🔄")
         else:
             st.error(
                 "⚠️ **Gemini quota exhausted.** "
-                "Add a `GROQ_API_KEY` to `.env.local` for automatic fallback to Groq, "
+                "Add a Groq key in the provider settings for answer-generation fallback, "
                 "or wait a minute and try again."
             )
             return
@@ -305,7 +312,7 @@ def user_input(user_question):
 
     # ── Fallback: Groq ───────────────────────────────────────────────────────────
     try:
-        chain    = get_conversational_chain(use_groq=True)
+        chain    = get_conversational_chain(use_groq=True, google_key=google_key, groq_key=groq_key)
         response = chain.invoke({"context": docs, "input": user_question})
         st.session_state.chat_history.append((user_question, response))
 

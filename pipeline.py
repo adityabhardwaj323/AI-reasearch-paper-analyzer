@@ -4,7 +4,6 @@ import docx
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import os
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-import google.generativeai as genai
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
 try:
@@ -31,10 +30,6 @@ load_dotenv(".env")
 # Retrieve API keys from environment variables
 google_api_key = os.getenv("GOOGLE_API_KEY")
 groq_api_key   = os.getenv("GROQ_API_KEY")
-
-# Configure the Generative AI API with the retrieved API key
-if google_api_key:
-    genai.configure(api_key=google_api_key)
 
 def handle_ai_errors(func):
     """Decorator to handle common AI API errors gracefully."""

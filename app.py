@@ -1,13 +1,21 @@
 import streamlit as st
 import time
 try:
-    from pipeline import get_files_text, get_text_chunks, get_vector_store, user_input
+    from pipeline import (
+        get_files_text,
+        get_text_chunks,
+        get_vector_store,
+        user_input,
+        google_api_key,
+    )
     PIPELINE_IMPORT_ERROR = None
+    GOOGLE_API_CONFIGURED = bool(google_api_key)
 except Exception as exc:
     # Keep the interface available when an optional AI/backend dependency is
     # missing or damaged; this is useful for local UI previews and diagnosis.
     get_files_text = get_text_chunks = get_vector_store = user_input = None
     PIPELINE_IMPORT_ERROR = str(exc)
+    GOOGLE_API_CONFIGURED = False
 from analysis import (
     keyword_frequency_chart,
     document_comparison_chart,
@@ -138,6 +146,14 @@ html, body,
     border-radius: 50%;
     box-shadow: 0 0 6px rgba(74,222,128,0.6);
     display: inline-block;
+}
+.pm-nav-dot.is-warning {
+    background: #fbbf24;
+    box-shadow: 0 0 6px rgba(251,191,36,0.55);
+}
+.pm-nav-dot.is-error {
+    background: var(--red);
+    box-shadow: 0 0 6px rgba(248,113,113,0.55);
 }
 
 /* ── HERO ── */
@@ -728,15 +744,25 @@ for k, v in _defaults.items():
 
 
 # ── Navbar (always shown) ────────────────────────────────────────────────────────
-st.markdown("""
+if PIPELINE_IMPORT_ERROR:
+    backend_status = "AI backend unavailable"
+    backend_status_class = "is-error"
+elif not GOOGLE_API_CONFIGURED:
+    backend_status = "Google API key needed"
+    backend_status_class = "is-warning"
+else:
+    backend_status = "Gemini key configured"
+    backend_status_class = ""
+
+st.markdown(f"""
 <div class="pm-nav">
     <div class="pm-nav-logo">
         <div class="pm-nav-icon">🧠</div>
         <span class="pm-nav-name">PaperMind</span>
     </div>
     <div class="pm-nav-right">
-        <span class="pm-nav-chip">Gemini 2.5 · RAG · FAISS</span>
-        <span class="pm-nav-dot"></span>
+        <span class="pm-nav-chip">{backend_status}</span>
+        <span class="pm-nav-dot {backend_status_class}"></span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -776,8 +802,15 @@ if not st.session_state.show_workspace:
                 disabled=PIPELINE_IMPORT_ERROR is not None,
             )
 
+            st.caption("PDF or DOCX · Up to 200 MB per file")
+            st.caption("After upload, PaperMind extracts the text and builds a searchable index for analysis and chat. Document text is sent to Google Gemini for embeddings and answers.")
+
             if PIPELINE_IMPORT_ERROR:
-                st.info("Preview mode: the interface is available, but document analysis is disabled because an AI dependency could not be loaded.")
+                st.error("The document-processing backend could not be loaded, so uploads and analysis are unavailable.")
+                with st.expander("Technical details"):
+                    st.code(PIPELINE_IMPORT_ERROR)
+            elif not GOOGLE_API_CONFIGURED:
+                st.warning("Add GOOGLE_API_KEY to .env.local to enable document analysis. You can still preview the upload interface.")
 
             if uploaded_files:
                 tags_html = "".join(
@@ -789,7 +822,7 @@ if not st.session_state.show_workspace:
 
             if st.button(
                 "⚡  Analyze Papers",
-                disabled=not uploaded_files or PIPELINE_IMPORT_ERROR is not None,
+                disabled=not uploaded_files or PIPELINE_IMPORT_ERROR is not None or not GOOGLE_API_CONFIGURED,
                 type="primary",
                 use_container_width=True,
             ):

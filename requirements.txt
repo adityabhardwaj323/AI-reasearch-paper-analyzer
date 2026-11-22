@@ -1,6 +1,7 @@
 streamlit
 streamlit-lottie
 google-generativeai
+google-api-core
 python-dotenv
 langchain
 langchain-core

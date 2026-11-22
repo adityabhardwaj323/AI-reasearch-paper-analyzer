@@ -332,6 +332,14 @@ html, body,
 }
 
 /* ── WORKSPACE SECTION HEADER ── */
+.pm-workspace-title {
+    font-family: 'Geist', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.7px;
+    color: var(--text);
+    margin-bottom: 4px;
+}
 .pm-section-header {
     display: flex;
     align-items: center;
@@ -834,18 +842,18 @@ if not st.session_state.show_workspace:
                     text_chunks = get_text_chunks(raw_text)
 
                     st.write("🔗 Building vector embeddings…")
-                    get_vector_store(text_chunks)
+                    index_ready = get_vector_store(text_chunks)
 
-                    st.session_state.combined_text = raw_text
-                    st.session_state.total_chunks  = len(text_chunks)
-                    st.session_state.show_workspace = True
-
-                    if text_chunks:
+                    if text_chunks and index_ready:
+                        st.session_state.combined_text = raw_text
+                        st.session_state.total_chunks  = len(text_chunks)
+                        st.session_state.show_workspace = True
                         status.update(label="✅ Ready — opening workspace…", state="complete", expanded=False)
                         time.sleep(0.6)
                         st.rerun()
                     else:
-                        status.update(label="⚠️ Processing failed — check your files.", state="error")
+                        st.error("PaperMind could not finish indexing these papers. Check that the files contain readable text and that the Google API key is valid, then try again.")
+                        status.update(label="⚠️ Indexing failed — workspace not opened.", state="error")
 
     st.markdown("""
     <div class="pm-pills">
@@ -871,6 +879,16 @@ else:
     with st.container():
         _, inner, _ = st.columns([0.03, 0.94, 0.03])
         with inner:
+
+            st.markdown('<div class="pm-workspace-title">Research workspace</div>', unsafe_allow_html=True)
+            st.caption("Your uploaded papers are indexed for chat and analysis. Use the document list to check which sources are included.")
+
+            if st.session_state.file_stats:
+                with st.expander(f"📚 Indexed papers · {len(st.session_state.file_stats)}", expanded=False):
+                    for paper in st.session_state.file_stats:
+                        with st.container(border=True):
+                            st.text(paper.get("name", "Untitled document"))
+                            st.caption(f"{paper.get('word_count', 0):,} words")
 
             # ── Stats bar ─────────────────────────────────────────────────────
             word_count = len(st.session_state.combined_text.split()) if st.session_state.combined_text else 0
@@ -898,7 +916,7 @@ else:
                 st.markdown("""
                 <div class="pm-section-header">
                     <span class="pm-section-title">💬 Chat Assistant</span>
-                    <span class="pm-section-badge pm-badge-green">● Live</span>
+                    <span class="pm-section-badge pm-badge-green">● Indexed</span>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -977,7 +995,7 @@ else:
                 st.markdown("""
                 <div class="pm-section-header">
                     <span class="pm-section-title">📊 Deep Analysis</span>
-                    <span class="pm-section-badge pm-badge-purple">AI · 6 modules</span>
+                    <span class="pm-section-badge pm-badge-purple">6 insight views</span>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -990,6 +1008,7 @@ else:
                         <span class="pm-promo-icon">🔬</span>
                         <div class="pm-promo-title">AI Technical Analysis</div>
                         <div class="pm-promo-sub">Extract methodology, key contributions, research gaps, tech stack, quality scores, and structured abstracts — in one click.</div>
+                        <div class="pm-promo-sub">Analysis is generated on demand and may take a little while for longer papers.</div>
                     </div>
                     """, unsafe_allow_html=True)
 

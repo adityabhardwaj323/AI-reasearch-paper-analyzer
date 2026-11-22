@@ -1,56 +1,58 @@
-# 🔬 Research Paper Analyzer (AI-Powered)
+# PaperMind — AI Research Analyst
 
-A premium, modern web application that allows you to upload and chat with multiple Research Papers (PDF & DOCX). Powered by **Google Gemini 2.5/3.1** and **LangChain**, this tool uses RAG (Retrieval-Augmented Generation) to provide accurate, context-aware answers from your documents.
+PaperMind lets you upload PDF and DOCX research papers, ask questions about them, and generate research insights with Gemini. Groq is an optional fallback for answer generation when Gemini reaches a quota limit.
 
-## ✨ Features
-- **Modern UI/UX**: Premium dark theme with glassmorphism, Lottie animations, and a sleek chat interface.
-- **Multi-Format Support**: Analyze both `.pdf` and `.docx` files simultaneously.
-- **Interactive Chat**: Natural conversation flow with AI that remembers context.
-- **Document Insights**: Real-time statistics and analysis status.
-- **Robust Processing**: Smart batched embeddings with rate-limit protection.
-- **FAISS Vector Store**: High-performance local vector database for fast similarity search.
+## Run locally
 
-## 🚀 Getting Started
+Use Python 3.12 and install the pinned dependencies:
 
-### 1. Prerequisites
-- Python 3.10+
-- A Google Gemini API Key (get one at [Google AI Studio](https://aistudio.google.com/))
-
-### 2. Installation
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd Research-Paper-Analyzer
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 3. Configuration
-You can enter your keys in the app's **Configure AI provider keys** panel. Keys entered there are held in the current Streamlit session and are not written to project files. For a local environment-based setup, create a `.env.local` file in the root directory:
-```text
-GOOGLE_API_KEY=your_actual_key_here
-GROQ_API_KEY=your_optional_fallback_key_here
-```
-
-Google Gemini is required because it creates document and query embeddings and provides the primary answers. Groq is optional and can provide the answer when Gemini's response generation reaches a quota limit; Gemini is still needed for search and embeddings. Papers and retrieved passages are sent to the provider handling that operation. The FAISS index is kept in a local per-session temporary folder and removed when you start a new session. When hosted remotely, serve the app over HTTPS and use a host you trust.
-
-### 4. Run the App
-```bash
+python -m pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## 🛠️ Technology Stack
-- **Frontend**: Streamlit (with Custom CSS)
-- **LLM**: Google Gemini 2.5-Flash
-- **Embeddings**: Google Gemini-Embedding-2
-- **Orchestration**: LangChain
-- **Vector Database**: FAISS
-- **Document Parsing**: pypdf, python-docx
+You can enter Google Gemini and optional Groq API keys in the app's **Configure AI provider keys** panel. Keys entered there are held in that Streamlit session and are not written to project files. For server-provided defaults, create an ignored `.env.local` file:
 
-## 🛡️ Security
-- API keys are managed via environment variables (`.env.local`).
-- FAISS index is stored locally on your machine.
+```text
+GOOGLE_API_KEY=your_google_key
+GROQ_API_KEY=your_optional_groq_key
+```
 
-## 📄 License
-This project is licensed under the MIT License.
+Google Gemini is required for document and query embeddings, search, and primary answers. Groq only handles answer generation when Gemini reaches quota; it cannot replace Gemini embeddings. Paper text is sent to Gemini. Retrieved passages and questions may also be sent to Groq during fallback.
+
+## Deploy on Streamlit Community Cloud
+
+1. Push this repository to GitHub.
+2. In [Streamlit Community Cloud](https://share.streamlit.io/), choose **Create app** and select this repository and the `main` branch.
+3. Set the app file path to `app.py`.
+4. In **Advanced settings**, select Python 3.12, then deploy.
+5. Open the deployed app and enter the keys in **Configure AI provider keys**. You can deploy without keys, but document analysis stays disabled until a Google Gemini key is provided.
+
+If you prefer to provide default keys through Cloud settings, add root-level values in the app's **Secrets** settings:
+
+```toml
+GOOGLE_API_KEY = "your_google_key"
+GROQ_API_KEY = "your_optional_groq_key"
+```
+
+Never commit `.streamlit/secrets.toml` or real API keys. The repository ignores local secrets files. For public deployments, users' session keys are processed by the app server; use a trusted host and HTTPS.
+
+Uploaded papers are indexed in a local temporary directory unique to each session. **New Session** removes that session's index. Temporary data can be lost when the hosted app restarts, so users may need to upload papers again after a restart.
+
+## Notes
+
+- `.streamlit/config.toml` sets the dark theme and the 200 MB per-file upload limit.
+- The dependency versions in `requirements.txt` are pinned for repeatable builds.
+- The default Streamlit Community Cloud Python version is 3.12; keep the deploy setting aligned with this project.
+
+## Technology
+
+- Streamlit
+- LangChain, Gemini, and optional Groq fallback
+- FAISS for per-session vector search
+- pypdf and python-docx for document extraction
+- Plotly and textstat for analysis visuals and reading metrics
+
+## License
+
+MIT

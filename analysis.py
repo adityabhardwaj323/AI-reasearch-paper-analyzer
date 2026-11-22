@@ -5,7 +5,6 @@ import collections
 import re
 import textstat
 import math
-import pandas as pd
 
 # Analysis functions for Research Paper AI
 

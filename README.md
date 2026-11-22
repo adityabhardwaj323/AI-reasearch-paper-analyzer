@@ -2,6 +2,19 @@
 
 PaperMind lets you upload PDF and DOCX research papers, ask questions about them, and generate research insights with Gemini. Groq is an optional fallback for answer generation when Gemini reaches a quota limit.
 
+**Live web app:** [Open PaperMind on Streamlit](https://ai-reasearch-paper-analyzer.streamlit.app/)
+
+## Features
+
+- Upload one or more PDF or DOCX papers (up to 200 MB per file), extract their text, and build a searchable, per-session index.
+- Ask questions across indexed papers in an AI chat, use suggested prompts, and receive answers grounded in retrieved passages with source names.
+- Run focused analysis for methodology, key contributions, research gaps and limitations, technology stack, research quality, and standardized abstract comparisons.
+- Explore paper statistics and visualizations for keyword frequency, document comparison, readability, sentence lengths, citation years, and indexed/retrieved chunks.
+- Review document and session metrics, clear the chat, refresh analysis, or start a new session that removes the session's local index.
+- Configure a Google Gemini API key in the app; optionally add a Groq key as a fallback for answer generation when Gemini reaches quota. Keys entered in the interface are held for the current Streamlit session.
+
+Gemini is required for embeddings, search, and primary answers. Groq does not replace Gemini for indexing. See the key and data handling notes below before using the hosted app.
+
 ## Run locally
 
 Use Python 3.12 and install the pinned dependencies:

@@ -260,6 +260,9 @@ html, body,
     border: 1px solid var(--border);
     border-radius: var(--r-xl);
     padding: 24px 28px;
+    width: 100%;
+    max-width: 840px;
+    margin: 0 auto;
     position: relative;
     overflow: hidden;
 }
@@ -356,7 +359,7 @@ html, body,
     gap: 8px;
 }
 .pm-section-badge {
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.5px;
     text-transform: uppercase;
@@ -411,7 +414,7 @@ html, body,
 .pm-chat-empty-title {
     font-size: 15px;
     font-weight: 600;
-    color: rgba(236,234,248,0.5);
+    color: var(--text-2);
     letter-spacing: -0.3px;
 }
 .pm-chat-empty-sub {
@@ -600,13 +603,31 @@ button[kind="primary"]:hover {
     border-radius: var(--r-md) !important;
 }
 [data-testid="stFileUploader"] label { display: none !important; }
+[data-testid="stFileUploader"] * { color: var(--text-2) !important; }
 [data-testid="stFileUploaderDropzone"] {
     padding: 28px 20px !important;
 }
-[data-testid="stFileUploaderDropzoneInstructions"] {
-    color: var(--text-3) !important;
+[data-testid="stFileUploaderDropzoneInstructions"],
+[data-testid="stFileUploaderDropzoneInstructions"] * {
+    color: var(--text-2) !important;
     font-family: 'Geist', sans-serif !important;
     font-size: 13px !important;
+    font-weight: 400 !important;
+}
+[data-testid="stFileUploaderDropzone"] button {
+    color: var(--text) !important;
+    background: var(--bg-3) !important;
+    border: 1px solid var(--border-hi) !important;
+}
+[data-testid="stFileUploader"] button {
+    color: var(--text) !important;
+    background: var(--bg-3) !important;
+    border: 1px solid var(--border-hi) !important;
+}
+[data-testid="stFileUploaderDropzone"] button * {
+    color: inherit !important;
+    background: transparent !important;
+    border: 0 !important;
 }
 
 /* ── METRICS ── */
@@ -704,7 +725,7 @@ hr { border-color: var(--border) !important; margin: 0 !important; }
 /* ── CAPTION ── */
 [data-testid="stCaptionContainer"] {
     font-family: 'Geist', sans-serif !important;
-    font-size: 11px !important;
+    font-size: 12px !important;
     color: var(--text-3) !important;
 }
 
@@ -724,6 +745,81 @@ hr { border-color: var(--border) !important; margin: 0 !important; }
 [data-testid="stChatMessage"][data-testid*="user"] [data-testid="stMarkdownContainer"] p {
     color: var(--text) !important;
     font-weight: 400 !important;
+}
+
+/* Keep keyboard focus visible across Streamlit controls. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[role="tab"]:focus-visible {
+    outline: 2px solid var(--accent-3) !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 0 4px rgba(167,139,250,0.18) !important;
+}
+.stButton > button:disabled {
+    color: var(--text-2) !important;
+    opacity: 0.72 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+
+@media (max-width: 640px) {
+    .pm-nav {
+        height: 54px;
+        padding: 0 16px;
+    }
+    .pm-nav-right { gap: 7px; }
+    .pm-nav-chip {
+        max-width: calc(100vw - 132px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 10px;
+        padding: 4px 9px;
+    }
+    .pm-hero { padding: 78px 18px 8px; }
+    .pm-h1 {
+        font-size: clamp(34px, 9vw, 46px);
+        letter-spacing: -1.4px;
+    }
+    .pm-sub { font-size: 15px; line-height: 1.65; }
+    .st-key-upload-card {
+        padding: 18px 16px;
+        border-radius: 18px;
+    }
+    [data-testid="stFileUploaderDropzone"] { padding: 20px 12px !important; }
+    .pm-pill { font-size: 11px; padding: 5px 10px; }
+    .pm-workspace-title { font-size: 21px; }
+    .pm-section-header { align-items: flex-start; gap: 8px; }
+    .pm-section-badge { white-space: nowrap; }
+    [data-testid="stMetricValue"] { font-size: 22px !important; }
+    [data-testid="stMetricLabel"] {
+        font-size: 10px !important;
+        letter-spacing: 0.4px !important;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+    }
+    .stTabs [data-baseweb="tab"] {
+        flex: 0 0 auto !important;
+        font-size: 11px !important;
+        padding: 5px 9px !important;
+        white-space: nowrap !important;
+    }
+    .pm-chat-empty { padding: 36px 16px; }
+    .stButton > button { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -796,8 +892,8 @@ if not st.session_state.show_workspace:
     </div>
     """, unsafe_allow_html=True)
 
-    # Upload card — centered narrow column
-    _, col_center, _ = st.columns([1, 2, 1])
+    # Upload card — full-width wrapper with a centered max-width card
+    col_center = st.container()
     with col_center:
         with st.container(key="upload-card"):
             st.markdown('<div class="pm-upload-title">Drop Your Research Papers</div>', unsafe_allow_html=True)

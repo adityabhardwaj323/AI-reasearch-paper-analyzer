@@ -44,8 +44,8 @@ st.markdown("""
     --border:    rgba(255,255,255,0.07);
     --border-hi: rgba(255,255,255,0.13);
     --text:      #eceaf8;
-    --text-2:    rgba(236,234,248,0.55);
-    --text-3:    rgba(236,234,248,0.3);
+    --text-2:    rgba(236,234,248,0.74);
+    --text-3:    rgba(236,234,248,0.54);
     --accent:    #7c6fec;
     --accent-2:  #a78bfa;
     --accent-3:  #c4b5fd;
@@ -125,7 +125,7 @@ html, body,
 .pm-nav-chip {
     font-size: 11px;
     font-weight: 500;
-    color: var(--text-3);
+    color: var(--text-2);
     background: var(--bg-2);
     border: 1px solid var(--border);
     border-radius: 99px;
@@ -142,15 +142,15 @@ html, body,
 
 /* ── HERO ── */
 .pm-hero {
-    min-height: 100vh;
+    min-height: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 60px 24px 80px;
+    padding: 56px 24px 8px;
     position: relative;
-    margin-top: -32px; /* Pull up to touch navbar */
+    margin-top: 0;
 }
 [data-testid="stFileUploader"] {
     margin-bottom: 24px !important;
@@ -173,7 +173,7 @@ html, body,
     letter-spacing: 2px;
     text-transform: uppercase;
     color: var(--accent-2);
-    margin-bottom: 28px;
+    margin-bottom: 20px;
 }
 .pm-eyebrow-line {
     width: 28px;
@@ -189,9 +189,11 @@ html, body,
     line-height: 1.08;
     letter-spacing: -2.5px;
     color: var(--text);
-    margin-bottom: 18px;
+    margin-bottom: 14px;
     max-width: 760px;
 }
+/* Streamlit adds a permalink control beside Markdown headings. */
+[data-testid="stHeaderActionElements"] { display: none !important; }
 .pm-h1 em {
     font-family: 'Instrument Serif', serif;
     font-style: italic;
@@ -207,14 +209,15 @@ html, body,
     line-height: 1.75;
     color: var(--text-2);
     max-width: 500px;
-    margin-bottom: 40px;
+    margin-bottom: 28px;
 }
 .pm-pills {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
     justify-content: center;
-    margin-bottom: 52px;
+    margin: 18px auto 0;
+    max-width: 760px;
 }
 .pm-pill {
     font-size: 12px;
@@ -236,15 +239,15 @@ html, body,
     max-width: 680px;
     margin: 0 auto;
 }
-.pm-upload-card {
+.st-key-upload-card {
     background: var(--bg-1);
     border: 1px solid var(--border);
     border-radius: var(--r-xl);
-    padding: 32px;
+    padding: 24px 28px;
     position: relative;
     overflow: hidden;
 }
-.pm-upload-card::before {
+.st-key-upload-card::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0;
@@ -756,72 +759,73 @@ if not st.session_state.show_workspace:
         </div>
         <h1 class="pm-h1">Understand papers,<br/><em>not just read them</em></h1>
         <p class="pm-sub">Upload your research PDFs or DOCX files and get instant deep analysis, methodology breakdowns, and an AI chat assistant trained on your documents.</p>
-        <div class="pm-pills">
-            <span class="pm-pill"><span>◈</span>Methodology Extraction</span>
-            <span class="pm-pill"><span>◈</span>Key Contributions</span>
-            <span class="pm-pill"><span>◈</span>Research Gaps</span>
-            <span class="pm-pill"><span>◈</span>Quality Scorecard</span>
-            <span class="pm-pill"><span>◈</span>Tech Stack Mapping</span>
-        </div>
     </div>
     """, unsafe_allow_html=True)
 
     # Upload card — centered narrow column
     _, col_center, _ = st.columns([1, 2, 1])
     with col_center:
-        st.markdown('<div class="pm-upload-card">', unsafe_allow_html=True)
-        st.markdown('<div class="pm-upload-title">Drop Your Research Papers</div>', unsafe_allow_html=True)
+        with st.container(key="upload-card"):
+            st.markdown('<div class="pm-upload-title">Drop Your Research Papers</div>', unsafe_allow_html=True)
 
-        uploaded_files = st.file_uploader(
-            "Upload files",
-            accept_multiple_files=True,
-            type=["pdf", "docx"],
-            label_visibility="collapsed",
-            disabled=PIPELINE_IMPORT_ERROR is not None,
-        )
-
-        if PIPELINE_IMPORT_ERROR:
-            st.info("Preview mode: the interface is available, but document analysis is disabled because an AI dependency could not be loaded.")
-
-        if uploaded_files:
-            tags_html = "".join(
-                f'<span class="pm-file-tag">📄 {f.name}</span>'
-                for f in uploaded_files
+            uploaded_files = st.file_uploader(
+                "Upload files",
+                accept_multiple_files=True,
+                type=["pdf", "docx"],
+                label_visibility="collapsed",
+                disabled=PIPELINE_IMPORT_ERROR is not None,
             )
-            st.markdown(f'<div class="pm-file-tags">{tags_html}</div>', unsafe_allow_html=True)
-            st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
 
-        if st.button(
-            "⚡  Analyze Papers",
-            disabled=not uploaded_files or PIPELINE_IMPORT_ERROR is not None,
-            type="primary",
-            use_container_width=True,
-        ):
-            with st.status("Processing your research papers…", expanded=True) as status:
-                st.write("📄 Extracting text from documents…")
-                raw_text = get_files_text(uploaded_files)
+            if PIPELINE_IMPORT_ERROR:
+                st.info("Preview mode: the interface is available, but document analysis is disabled because an AI dependency could not be loaded.")
 
-                st.write("✂️ Splitting into semantic chunks…")
-                text_chunks = get_text_chunks(raw_text)
+            if uploaded_files:
+                tags_html = "".join(
+                    f'<span class="pm-file-tag">📄 {f.name}</span>'
+                    for f in uploaded_files
+                )
+                st.markdown(f'<div class="pm-file-tags">{tags_html}</div>', unsafe_allow_html=True)
+                st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
 
-                st.write("🔗 Building vector embeddings…")
-                get_vector_store(text_chunks)
+            if st.button(
+                "⚡  Analyze Papers",
+                disabled=not uploaded_files or PIPELINE_IMPORT_ERROR is not None,
+                type="primary",
+                use_container_width=True,
+            ):
+                with st.status("Processing your research papers…", expanded=True) as status:
+                    st.write("📄 Extracting text from documents…")
+                    raw_text = get_files_text(uploaded_files)
 
-                st.session_state.combined_text = raw_text
-                st.session_state.total_chunks  = len(text_chunks)
-                st.session_state.show_workspace = True
+                    st.write("✂️ Splitting into semantic chunks…")
+                    text_chunks = get_text_chunks(raw_text)
 
-                if text_chunks:
-                    status.update(label="✅ Ready — opening workspace…", state="complete", expanded=False)
-                    time.sleep(0.6)
-                    st.rerun()
-                else:
-                    status.update(label="⚠️ Processing failed — check your files.", state="error")
+                    st.write("🔗 Building vector embeddings…")
+                    get_vector_store(text_chunks)
 
-        st.markdown('</div>', unsafe_allow_html=True)
+                    st.session_state.combined_text = raw_text
+                    st.session_state.total_chunks  = len(text_chunks)
+                    st.session_state.show_workspace = True
+
+                    if text_chunks:
+                        status.update(label="✅ Ready — opening workspace…", state="complete", expanded=False)
+                        time.sleep(0.6)
+                        st.rerun()
+                    else:
+                        status.update(label="⚠️ Processing failed — check your files.", state="error")
+
+    st.markdown("""
+    <div class="pm-pills">
+        <span class="pm-pill"><span>◈</span>Methodology Extraction</span>
+        <span class="pm-pill"><span>◈</span>Key Contributions</span>
+        <span class="pm-pill"><span>◈</span>Research Gaps</span>
+        <span class="pm-pill"><span>◈</span>Quality Scorecard</span>
+        <span class="pm-pill"><span>◈</span>Tech Stack Mapping</span>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Bottom breathing room
-    st.markdown('<div style="height:120px;"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="height:48px;"></div>', unsafe_allow_html=True)
 
 
 # ════════════════════════════════════════════════════════════════════════════════
